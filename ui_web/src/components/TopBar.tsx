@@ -5,6 +5,7 @@ interface Props {
   phase: RoutePhase;
   eleOk: boolean;
   pointCount: number;
+  connectedPhones?: number;
   onOpenDiagnostic: () => void;
   onToggleSidebar: () => void;
 }
@@ -17,7 +18,7 @@ const PHASES: Record<RoutePhase, { label: string; className: string }> = {
   direct: { label: "Mode direct · routage indisponible", className: "border-amberx/25 bg-amberx/[0.07] text-amberx" },
 };
 
-export default function TopBar({ phase, eleOk, pointCount, onOpenDiagnostic, onToggleSidebar }: Props) {
+export default function TopBar({ phase, eleOk, pointCount, connectedPhones = 0, onOpenDiagnostic, onToggleSidebar }: Props) {
   const busy = phase === "routing" || phase === "elevation";
   const meta = PHASES[phase];
   const label = phase === "ready" && !eleOk ? "Tracé prêt · altitude du départ" : meta.label;
@@ -64,8 +65,18 @@ export default function TopBar({ phase, eleOk, pointCount, onOpenDiagnostic, onT
 
       <div className="flex-1" />
 
-      <div className="hidden items-center gap-2 rounded-full border border-line bg-panel-2/60 px-3 py-1.5 text-[8.5px] font-bold tracking-[0.12em] text-slate-500 sm:flex">
-        <FlaskConical size={11} className="text-volt" /> BANC D’ESSAI LOCAL
+      <div className="hidden items-center gap-2 rounded-full border border-line bg-panel-2/60 px-3 py-1.5 text-[8.5px] font-bold tracking-[0.12em] sm:flex">
+        {connectedPhones > 0 ? (
+          <span className="flex items-center gap-1.5 text-volt">
+            <span className="inline-block h-2 w-2 rounded-full bg-volt animate-pulse" />
+            {connectedPhones} TÉLÉPHONE{connectedPhones > 1 ? "S" : ""} CONNECTÉ{connectedPhones > 1 ? "S" : ""} (ADB)
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-slate-500">
+            <FlaskConical size={11} className="text-volt" />
+            EN ATTENTE TÉLÉPHONE (ADB)
+          </span>
+        )}
       </div>
 
       <button

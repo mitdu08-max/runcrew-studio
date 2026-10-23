@@ -59,6 +59,7 @@ export default function App() {
         phase={sim.phase}
         eleOk={!!sim.track?.ele}
         pointCount={sim.waypoints.length}
+        connectedPhones={sim.connectedPhones}
         onOpenDiagnostic={() => setModalOpen(true)}
         onToggleSidebar={() => setSidebarOpen((value) => !value)}
       />

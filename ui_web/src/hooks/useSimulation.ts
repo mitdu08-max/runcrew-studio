@@ -127,6 +127,52 @@ export function useSimulation() {
     setEvents((current) => [...current.slice(-79), event]);
   }, []);
 
+  const [connectedPhones, setConnectedPhones] = useState(0);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let timer: any = null;
+    let disposed = false;
+
+    function connect() {
+      if (disposed) return;
+      try {
+        const host = window.location.hostname || "127.0.0.1";
+        ws = new WebSocket(`ws://${host}:9876/dashboard`);
+        ws.onopen = () => {
+          if (disposed) return;
+          wsRef.current = ws;
+        };
+        ws.onmessage = (ev) => {
+          try {
+            const data = JSON.parse(ev.data);
+            if (data.type === "clients" && typeof data.phones === "number") {
+              setConnectedPhones(data.phones);
+            }
+          } catch (_) {}
+        };
+        ws.onclose = () => {
+          if (disposed) return;
+          wsRef.current = null;
+          timer = setTimeout(connect, 2000);
+        };
+        ws.onerror = () => {
+          ws?.close();
+        };
+      } catch (_) {
+        timer = setTimeout(connect, 2000);
+      }
+    }
+    connect();
+
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      ws?.close();
+    };
+  }, []);
+
   // ---- parcours sauvegardés (format compatible avec la version .exe) ----
   const refreshSaved = useCallback(() => {
     try {
@@ -316,6 +362,31 @@ export function useSimulation() {
       accuracy,
       gpsMode: mode,
     });
+
+    // 🚀 Diffusion automatique vers server.js et le smartphone
+    const packet = {
+      type: "position",
+      lat: displayPos[0],
+      lon: displayPos[1],
+      lng: displayPos[1],
+      heading: displayHeading,
+      alt,
+      altitude: alt,
+      speedKmh: speedRef.current,
+      speed: (speedRef.current * 1000) / 3600,
+      accuracy: accuracy != null ? accuracy : 3.0,
+      eleReal,
+      gpsMode: mode,
+    };
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(packet));
+    } else {
+      fetch("/api/telemetry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(packet),
+      }).catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -351,6 +422,11 @@ export function useSimulation() {
       `Simulation arrêtée · ${(session.current / 1000).toFixed(2)} km · ${Math.round(elapsed.current)} s simulées`,
       "info",
     );
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "stop" }));
+    } else {
+      fetch("/api/inject_stop", { method: "POST" }).catch(() => {});
+    }
     setRunning(false);
     setPaused(false);
     setTelemetry(null);
@@ -524,5 +600,6 @@ export function useSimulation() {
     saveTrack,
     loadTrack,
     exportGpx,
+    connectedPhones,
   };
 }

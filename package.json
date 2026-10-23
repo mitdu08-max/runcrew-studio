@@ -12,5 +12,10 @@
   "type": "commonjs",
   "dependencies": {
     "ws": "^8.21.3"
+  },
+  "pkg": {
+    "assets": [
+      "ui_dist.html"
+    ]
   }
 }

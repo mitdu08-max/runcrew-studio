@@ -37,9 +37,31 @@
 // ===========================================================================
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const { exec } = require('child_process');
 const WebSocket = require('ws');
 const WebSocketServer = WebSocket.Server || WebSocket.WebSocketServer;
+
+let modernHtml = null;
+function getHtmlContent() {
+  if (modernHtml) return modernHtml;
+  const candidates = [
+    path.join(__dirname, 'ui_dist.html'),
+    path.join(__dirname, 'ui_web', 'dist', 'index.html'),
+    path.join(process.cwd(), 'ui_dist.html'),
+    path.join(process.cwd(), 'ui_web', 'dist', 'index.html'),
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) {
+        modernHtml = fs.readFileSync(c, 'utf8');
+        return modernHtml;
+      }
+    } catch (_) {}
+  }
+  return htmlContent;
+}
 
 process.on('uncaughtException', (err) => {
   console.error('❌ [Erreur interne] :', err);
@@ -157,6 +179,39 @@ wss.on('connection', (ws, req) => {
     }, 120);
   }
   updateIdleHeartbeat();
+
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw);
+      if (msg.type === 'position' || msg.type === 'telemetry') {
+        const out = {
+          type: 'position',
+          lat: msg.lat,
+          lon: msg.lon ?? msg.lng,
+          lng: msg.lng ?? msg.lon,
+          speed: msg.speed != null ? msg.speed : (msg.speedKmh ? (msg.speedKmh * 1000) / 3600 : 0),
+          speedKmh: msg.speedKmh != null ? msg.speedKmh : (msg.speed ? msg.speed * 3.6 : 0),
+          heading: msg.heading || 0,
+          altitude: msg.alt != null ? msg.alt : (msg.altitude != null ? msg.altitude : baseAlt),
+          altitudeSource: msg.eleReal ? 'srtm' : 'fallback',
+          accuracy: msg.accuracy != null ? msg.accuracy : 3.0,
+          provider: 'gps',
+          satellites: 12,
+          bearingAccuracy: 5.0,
+          hr: msg.hr || 0,
+          cadence: msg.cadence || 0,
+          timestamp: Date.now()
+        };
+        clients.filter(c => c._rcKind === 'phone').forEach(c => {
+          if (c.readyState === 1) c.send(JSON.stringify(out));
+        });
+      } else if (msg.type === 'stop') {
+        clients.filter(c => c._rcKind === 'phone').forEach(c => {
+          if (c.readyState === 1) c.send(JSON.stringify({ type: 'stop' }));
+        });
+      }
+    } catch (_) {}
+  });
 
   ws.on('close', () => {
     clients = clients.filter(c => c !== ws);
@@ -1922,7 +1977,47 @@ const server = http.createServer((req, res) => {
   // ---------- page ----------
   if (url.pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(htmlContent);
+    res.end(getHtmlContent());
+
+  // ---------- télémétrie injectée depuis UI moderne ----------
+  } else if (url.pathname === '/api/telemetry') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const msg = JSON.parse(body);
+        const out = {
+          type: 'position',
+          lat: msg.lat,
+          lon: msg.lon ?? msg.lng,
+          lng: msg.lng ?? msg.lon,
+          speed: msg.speed != null ? msg.speed : (msg.speedKmh ? (msg.speedKmh * 1000) / 3600 : 0),
+          speedKmh: msg.speedKmh != null ? msg.speedKmh : (msg.speed ? msg.speed * 3.6 : 0),
+          heading: msg.heading || 0,
+          altitude: msg.alt != null ? msg.alt : (msg.altitude != null ? msg.altitude : baseAlt),
+          altitudeSource: msg.eleReal ? 'srtm' : 'fallback',
+          accuracy: msg.accuracy != null ? msg.accuracy : 3.0,
+          provider: 'gps',
+          satellites: 12,
+          bearingAccuracy: 5.0,
+          hr: msg.hr || 0,
+          cadence: msg.cadence || 0,
+          timestamp: Date.now()
+        };
+        clients.filter(c => c._rcKind === 'phone').forEach(c => {
+          if (c.readyState === 1) c.send(JSON.stringify(out));
+        });
+        json({ ok: true, phones: phoneCount() });
+      } catch (e) {
+        json({ error: e.message });
+      }
+    });
+
+  } else if (url.pathname === '/api/inject_stop') {
+    clients.filter(c => c._rcKind === 'phone').forEach(c => {
+      if (c.readyState === 1) c.send(JSON.stringify({ type: 'stop' }));
+    });
+    json({ ok: true });
 
   // ---------- simulation ----------
   } else if (url.pathname === '/api/start') {
