@@ -78,11 +78,37 @@ export default function MapView(props: Props) {
     map.attributionControl.setPrefix(false);
     map.zoomControl.setPosition("bottomright");
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 20,
-      subdomains: "abcd",
-      attribution: "© OpenStreetMap · © CARTO · Élévation Open-Meteo SRTM",
-    }).addTo(map);
+    // Tuiles sans clé API (OpenStreetMap avec filtre sombre + secours Esri Dark)
+    map.createPane("paneDark");
+    const darkPane = map.getPane("paneDark");
+    if (darkPane) {
+      darkPane.style.zIndex = "200";
+      darkPane.style.filter = "invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.22)";
+    }
+
+    const osmDark = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      pane: "paneDark",
+      maxZoom: 19,
+      attribution: "© OpenStreetMap · Élévation Open-Meteo SRTM",
+    });
+
+    const esriDark = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 19,
+        attribution: "© Esri · © OpenStreetMap",
+      }
+    );
+
+    osmDark.addTo(map);
+
+    let tileBroken = false;
+    osmDark.on("tileerror", () => {
+      if (tileBroken) return;
+      tileBroken = true;
+      map.removeLayer(osmDark);
+      esriDark.addTo(map);
+    });
 
     L.control.scale({ position: "bottomleft", imperial: false }).addTo(map);
     glowRef.current = L.polyline([], { weight: 12, opacity: 0.13, lineJoin: "round" }).addTo(map);
