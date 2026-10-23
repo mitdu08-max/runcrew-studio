@@ -38,7 +38,8 @@
 const http = require('http');
 const https = require('https');
 const { exec } = require('child_process');
-const { WebSocketServer } = require('ws');
+const WebSocket = require('ws');
+const WebSocketServer = WebSocket.Server || WebSocket.WebSocketServer;
 
 process.on('uncaughtException', (err) => {
   console.error('❌ [Erreur interne] :', err);
