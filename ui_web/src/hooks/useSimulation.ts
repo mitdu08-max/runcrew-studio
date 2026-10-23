@@ -395,6 +395,60 @@ export function useSimulation() {
     return () => clearInterval(iv);
   }, [running, paused, advance]);
 
+  // 🛰️ Battement de vie IDLE : dès qu'un point ou tracé existe sur la carte Studio,
+  // diffuse immédiatement et à 1 Hz la position et l'altitude réelle du départ (ex: 315 m).
+  // Ainsi le smartphone connecté affiche la MÊME altitude sans attendre le clic "Démarrer".
+  useEffect(() => {
+    if (running) return;
+
+    const emitIdle = () => {
+      const t = trackRef.current;
+      let pos: [number, number] | null = null;
+      let alt: number | null = null;
+
+      if (t && t.points.length > 0) {
+        pos = t.points[0];
+        alt = t.ele && t.ele.length > 0 ? t.ele[0] : depEleRef.current;
+      } else if (waypoints.length > 0) {
+        pos = waypoints[0];
+        alt = depEleRef.current;
+      }
+
+      if (!pos) return;
+      const startAlt = alt != null ? Math.round(alt * 10) / 10 : 315.0;
+
+      const packet = {
+        type: "position",
+        lat: pos[0],
+        lon: pos[1],
+        lng: pos[1],
+        heading: 0,
+        alt: startAlt,
+        altitude: startAlt,
+        speedKmh: 0,
+        speed: 0,
+        accuracy: 3.0,
+        eleReal: true,
+        gpsMode: "nominal",
+        idle: true,
+      };
+
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(packet));
+      } else {
+        fetch("/api/telemetry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(packet),
+        }).catch(() => {});
+      }
+    };
+
+    emitIdle();
+    const iv = setInterval(emitIdle, 1000);
+    return () => clearInterval(iv);
+  }, [running, waypoints]);
+
   // ---- actions de pilotage ----
   const start = useCallback((): boolean => {
     const t = trackRef.current;
