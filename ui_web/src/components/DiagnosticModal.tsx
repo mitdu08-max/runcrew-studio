@@ -2,8 +2,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   X, Bug, FileDown, CheckCircle2, Ruler, Database, Spline, Waves, Play, AlertTriangle,
 } from "lucide-react";
-import rawServer from "../assets/fix/server.js?raw";
-import rawPs1 from "../assets/fix/RunCrew_Recompile.ps1?raw";
+import rawServer from "../../../server.js?raw";
+import rawPs1 from "../../../build_exe.ps1?raw";
 
 function dl(name: string, content: string) {
   const u = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
@@ -39,17 +39,21 @@ export default function DiagnosticModal({ open, onClose }: { open: boolean; onCl
             exit={{ opacity: 0, y: 16, scale: 0.98 }}
             transition={{ type: "spring", damping: 26, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Guide technique du moteur d’altitude"
             className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl"
           >
             <div className="flex items-center justify-between border-b border-line bg-panel-2/70 px-5 py-4">
               <div>
                 <h2 className="text-[15px] font-extrabold tracking-wide text-white">
-                  DIAGNOSTIC — <span className="text-amberx">POURQUOI 52 M AU LIEU DE 315 M ?</span>
+                  GUIDE TECHNIQUE — <span className="text-amberx">MOTEUR D’ALTITUDE RÉELLE</span>
                 </h2>
-                <p className="mt-0.5 text-[11px] text-slate-500">Analyse du moteur GPS + correctif prêt à compiler</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Comprendre le pipeline SRTM, vérifier le correctif et compiler le banc d’essai</p>
               </div>
               <button
                 onClick={onClose}
+                aria-label="Fermer le guide technique"
                 className="rounded-lg border border-line p-1.5 text-slate-400 transition-colors hover:border-rose-500/50 hover:text-rose-400"
               >
                 <X size={16} />
@@ -130,8 +134,8 @@ export default function DiagnosticModal({ open, onClose }: { open: boolean; onCl
                   APPLIQUER LE CORRECTIF À TON .EXE
                 </h3>
                 <ol className="mb-4 space-y-1.5 text-[11.5px] leading-relaxed text-slate-400">
-                  <li><span className="num font-bold text-volt">1.</span> Télécharge <b className="text-slate-200">server.js</b> et remplace l'ancien dans <span className="num text-slate-300">C:\Users\ATony\RunnerDashboard</span></li>
-                  <li><span className="num font-bold text-volt">2.</span> Télécharge et lance <b className="text-slate-200">RunCrew_Recompile.ps1</b> (libère les ports, recompile avec pkg, tunnel ADB, démarre)</li>
+                  <li><span className="num font-bold text-volt">1.</span> Télécharge <b className="text-slate-200">server.js</b> et remplace l’ancien fichier à la racine de ton projet RunCrew Studio.</li>
+                  <li><span className="num font-bold text-volt">2.</span> Télécharge et lance <b className="text-slate-200">build_exe.ps1</b> pour recompiler l’exécutable Windows avec pkg.</li>
                   <li><span className="num font-bold text-volt">3.</span> L'exe démarre : altitude réelle dès le 1er point, D+/D− et profil sur ta carte habituelle</li>
                 </ol>
                 <div className="flex flex-wrap gap-2">
@@ -142,10 +146,10 @@ export default function DiagnosticModal({ open, onClose }: { open: boolean; onCl
                     <FileDown size={14} /> SERVER.JS CORRIGÉ
                   </button>
                   <button
-                    onClick={() => dl("RunCrew_Recompile.ps1", rawPs1)}
+                    onClick={() => dl("build_exe.ps1", rawPs1)}
                     className="flex items-center gap-2 rounded-xl border border-amberx/50 bg-amberx/10 px-4 py-2.5 text-[12px] font-extrabold text-amberx transition-colors hover:bg-amberx/20"
                   >
-                    <FileDown size={14} /> RUNCREW_RECOMPILE.PS1
+                    <FileDown size={14} /> BUILD_EXE.PS1
                   </button>
                 </div>
               </div>

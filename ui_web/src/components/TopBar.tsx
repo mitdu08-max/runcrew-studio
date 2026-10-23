@@ -1,4 +1,4 @@
-import { Route, Mountain, Globe2, Loader2, Wrench } from "lucide-react";
+import { BookOpen, CheckCircle2, FlaskConical, Loader2, Menu, MousePointer2, Route, TriangleAlert } from "lucide-react";
 import type { RoutePhase } from "../hooks/useSimulation";
 
 interface Props {
@@ -6,73 +6,75 @@ interface Props {
   eleOk: boolean;
   pointCount: number;
   onOpenDiagnostic: () => void;
+  onToggleSidebar: () => void;
 }
 
-const phaseLabel: Record<RoutePhase, string> = {
-  empty: "EN ATTENTE DE POINTS",
-  routing: "Routage OSRM…",
-  elevation: "Élévation SRTM…",
-  ready: "Trace synchronisée",
-  direct: "Repli segments directs",
+const PHASES: Record<RoutePhase, { label: string; className: string }> = {
+  empty: { label: "En attente d’un parcours", className: "border-line bg-panel-2 text-slate-500" },
+  routing: { label: "Calcul de l’itinéraire", className: "border-sky-400/25 bg-sky-400/[0.07] text-sky-300" },
+  elevation: { label: "Lecture de l’altitude réelle", className: "border-amberx/25 bg-amberx/[0.07] text-amberx" },
+  ready: { label: "Parcours synchronisé", className: "border-volt/25 bg-volt/[0.07] text-volt" },
+  direct: { label: "Mode direct · routage indisponible", className: "border-amberx/25 bg-amberx/[0.07] text-amberx" },
 };
 
-export default function TopBar({ phase, eleOk, pointCount, onOpenDiagnostic }: Props) {
+export default function TopBar({ phase, eleOk, pointCount, onOpenDiagnostic, onToggleSidebar }: Props) {
   const busy = phase === "routing" || phase === "elevation";
+  const meta = PHASES[phase];
+  const label = phase === "ready" && !eleOk ? "Tracé prêt · altitude du départ" : meta.label;
+
   return (
-    <header className="relative z-20 flex h-14 shrink-0 items-center gap-4 border-b border-line bg-panel/90 px-4 backdrop-blur-md">
+    <header className="relative z-20 flex h-16 shrink-0 items-center gap-3 border-b border-line bg-panel/95 px-3 backdrop-blur-xl sm:px-4">
+      <button
+        onClick={onToggleSidebar}
+        className="rounded-lg border border-line p-2 text-slate-400 transition-colors hover:text-white lg:hidden"
+        aria-label="Ouvrir les réglages"
+      >
+        <Menu size={18} />
+      </button>
+
       <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-volt shadow-[0_0_22px_rgba(0,230,118,.4)]">
-          <Route size={17} strokeWidth={2.5} className="text-ink" />
+        <div className="brand-mark flex h-9 w-9 items-center justify-center rounded-xl bg-volt text-ink">
+          <Route size={19} strokeWidth={2.4} />
         </div>
         <div className="leading-tight">
-          <div className="text-[13px] font-bold tracking-[0.18em] text-white">
+          <div className="text-[13px] font-bold tracking-[0.14em] text-white">
             RUNCREW <span className="text-volt">STUDIO</span>
           </div>
-          <div className="text-[9.5px] font-semibold tracking-[0.14em] text-slate-500">
-            MOTEUR GPS v2 · ALTITUDE RÉELLE
+          <div className="mt-1 hidden text-[8.5px] font-semibold uppercase tracking-[0.16em] text-slate-600 sm:block">
+            Laboratoire de télémétrie · v3
           </div>
         </div>
       </div>
 
-      <div className="mx-1 h-6 w-px bg-line" />
+      <div className="mx-2 hidden h-7 w-px bg-line md:block" />
 
-      {/* statuts pipeline */}
-      <div className="hidden items-center gap-2 md:flex">
-        <span
-          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9.5px] font-bold tracking-wider ${
-            busy
-              ? "border-sky-500/40 bg-sky-500/10 text-sky-300"
-              : pointCount >= 2
-                ? "border-volt/40 bg-volt/10 text-volt"
-                : "border-line bg-panel-2 text-slate-500"
-          }`}
-        >
-          {busy ? <Loader2 size={10} className="spin" /> : <Globe2 size={10} />}
-          {phaseLabel[phase]}
-        </span>
-        <span
-          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9.5px] font-bold tracking-wider ${
-            busy
-              ? "border-amberx/40 bg-amberx/10 text-amberx"
-              : eleOk
-                ? "border-amberx/50 bg-amberx/10 text-amberx"
-                : "border-line bg-panel-2 text-slate-500"
-          }`}
-        >
-          {busy ? <Loader2 size={10} className="spin" /> : <Mountain size={10} />}
-          ÉLÉVATION {eleOk ? "SRTM · OK" : "OPEN-METEO"}
-        </span>
+      <div className={`hidden min-w-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[9.5px] font-semibold md:flex ${meta.className}`} role="status">
+        {busy ? (
+          <Loader2 size={11} className="spin shrink-0" />
+        ) : phase === "ready" ? (
+          <CheckCircle2 size={11} className="shrink-0" />
+        ) : phase === "direct" ? (
+          <TriangleAlert size={11} className="shrink-0" />
+        ) : (
+          <MousePointer2 size={11} className="shrink-0" />
+        )}
+        <span className="truncate">{label}</span>
+        {pointCount > 0 && <span className="num rounded-full bg-black/20 px-1.5 py-0.5 text-[8px] opacity-75">{pointCount} pts</span>}
       </div>
 
       <div className="flex-1" />
 
+      <div className="hidden items-center gap-2 rounded-full border border-line bg-panel-2/60 px-3 py-1.5 text-[8.5px] font-bold tracking-[0.12em] text-slate-500 sm:flex">
+        <FlaskConical size={11} className="text-volt" /> BANC D’ESSAI LOCAL
+      </div>
+
       <button
         onClick={onOpenDiagnostic}
-        className="group flex items-center gap-2 rounded-xl border border-amberx/50 bg-amberx/10 px-4 py-2 text-[11px] font-bold tracking-wide text-amberx transition-all hover:bg-amberx hover:text-ink hover:shadow-[0_0_28px_rgba(255,171,0,.4)]"
+        className="flex items-center gap-2 rounded-xl border border-line bg-panel-2/60 px-3 py-2 text-[10px] font-semibold text-slate-400 transition-colors hover:border-slate-600 hover:text-white"
+        title="Guide technique, correctif d’altitude et fichiers de compilation"
       >
-        <Wrench size={13} className="transition-transform group-hover:-rotate-12" />
-        <span className="hidden sm:inline">CORRECTIF ALTITUDE — BUG 52 M / 315 M</span>
-        <span className="sm:hidden">CORRECTIF</span>
+        <BookOpen size={14} />
+        <span className="hidden xl:inline">Guide technique</span>
       </button>
     </header>
   );

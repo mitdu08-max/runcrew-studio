@@ -4,15 +4,17 @@
   --color-volt: #00e676;
   --color-volt-dim: #00e67626;
   --color-amberx: #ffab00;
-  --color-ink: #05070b;
-  --color-panel: #0b0e15;
-  --color-panel-2: #11151f;
-  --color-line: #1c2230;
+  --color-ink: #080b10;
+  --color-panel: #0d1218;
+  --color-panel-2: #121820;
+  --color-line: #222b36;
   --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
@@ -22,70 +24,133 @@ body {
   font-family: var(--font-display);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:not(:disabled),
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(0, 230, 118, 0.8);
+  outline-offset: 2px;
 }
 
 ::selection {
-  background: #00e67655;
+  background: rgba(0, 230, 118, 0.28);
+  color: #fff;
 }
 
 /* ---- scrollbars ---- */
-*::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: #232a3a; border-radius: 8px; }
-*::-webkit-scrollbar-thumb:hover { background: #2e3850; }
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #28323f;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #374454;
+}
 
 /* ---- map ---- */
 .leaflet-container {
-  background: #070a10;
+  background-color: #090e13;
+  background-image:
+    radial-gradient(circle at 50% 40%, rgba(25, 45, 52, 0.28), transparent 48%),
+    linear-gradient(rgba(120, 140, 160, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 140, 160, 0.035) 1px, transparent 1px);
+  background-size: auto, 36px 36px, 36px 36px;
   font-family: var(--font-display);
   outline: none;
+  cursor: crosshair;
 }
 .leaflet-control-attribution {
-  background: rgba(5, 7, 11, 0.72) !important;
-  color: #4b5568 !important;
-  font-size: 9px !important;
-  backdrop-filter: blur(4px);
+  background: rgba(8, 11, 16, 0.78) !important;
+  color: #566273 !important;
+  font-size: 8px !important;
+  backdrop-filter: blur(6px);
 }
-.leaflet-control-attribution a { color: #64748b !important; }
+.leaflet-control-attribution a {
+  color: #718096 !important;
+}
 .leaflet-control-zoom {
-  border: 1px solid #1c2230 !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,.5) !important;
-  border-radius: 10px !important;
+  border: 1px solid #222b36 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  border-radius: 11px !important;
   overflow: hidden;
 }
 .leaflet-control-zoom a {
-  background: #0b0e15ee !important;
-  color: #9aa6bc !important;
-  border-bottom: 1px solid #1c2230 !important;
+  width: 34px !important;
+  height: 34px !important;
+  background: rgba(13, 18, 24, 0.94) !important;
+  color: #9aa6b8 !important;
+  border-bottom: 1px solid #222b36 !important;
+  font: 400 20px/34px var(--font-display) !important;
 }
-.leaflet-control-zoom a:hover { background: #141926 !important; color: #00e676 !important; }
+.leaflet-control-zoom a:hover {
+  background: #17202a !important;
+  color: #00e676 !important;
+}
+.leaflet-control-scale-line {
+  border: 0 !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.55) !important;
+  background: rgba(8, 11, 16, 0.7) !important;
+  color: #8b98aa !important;
+  font: 600 8px/1.4 var(--font-mono) !important;
+  text-shadow: none !important;
+  backdrop-filter: blur(4px);
+}
+.wp-marker.is-draggable {
+  cursor: grab;
+}
+.wp-marker.is-draggable:active {
+  cursor: grabbing;
+}
 
 .dep-tt {
-  background: #0b0e15f2 !important;
-  border: 1px solid #ffab0066 !important;
+  background: rgba(13, 18, 24, 0.96) !important;
+  border: 1px solid rgba(255, 171, 0, 0.4) !important;
   color: #ffab00 !important;
   font-family: var(--font-mono) !important;
-  font-size: 10.5px !important;
+  font-size: 9px !important;
   font-weight: 700 !important;
-  border-radius: 8px !important;
-  padding: 4px 8px !important;
-  box-shadow: 0 6px 20px rgba(0,0,0,.55) !important;
+  border-radius: 7px !important;
+  padding: 4px 7px !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
 }
-.dep-tt::before { display: none !important; }
-
-.wp-tt {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+.dep-tt::before {
+  display: none !important;
 }
-.wp-tt::before { display: none !important; }
 
 @keyframes runner-pulse {
-  0%   { transform: scale(0.6); opacity: 0.9; }
-  100% { transform: scale(2.2); opacity: 0; }
+  0% {
+    transform: scale(0.6);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(2.15);
+    opacity: 0;
+  }
 }
 .runner-pulse {
-  animation: runner-pulse 1.6s ease-out infinite;
+  animation: runner-pulse 1.7s ease-out infinite;
 }
 
 /* ---- inputs ---- */
@@ -93,55 +158,116 @@ input[type="range"].rc-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 5px;
+  height: 4px;
   border-radius: 99px;
-  background: linear-gradient(90deg, #00e676 var(--fill, 30%), #1c2230 var(--fill, 30%));
+  background: linear-gradient(90deg, #00e676 var(--fill, 30%), #27313d var(--fill, 30%));
   outline: none;
   cursor: pointer;
 }
 input[type="range"].rc-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 18px; height: 18px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
   background: #00e676;
-  border: 3px solid #05070b;
-  box-shadow: 0 0 0 2px #00e676, 0 0 16px #00e67688;
+  border: 3px solid #0d1218;
+  box-shadow: 0 0 0 1.5px #00e676;
   cursor: grab;
 }
 input[type="range"].rc-slider::-moz-range-thumb {
-  width: 14px; height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: #00e676;
-  border: 3px solid #05070b;
-  box-shadow: 0 0 0 2px #00e676, 0 0 16px #00e67688;
+  border: 3px solid #0d1218;
+  box-shadow: 0 0 0 1.5px #00e676;
   cursor: grab;
 }
 
-/* ---- décor ---- */
-.bg-blueprint {
-  background-image:
-    linear-gradient(rgba(120, 140, 180, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(120, 140, 180, 0.05) 1px, transparent 1px);
-  background-size: 36px 36px;
+select {
+  color-scheme: dark;
 }
 
-.glass {
-  background: rgba(11, 14, 21, 0.82);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+kbd {
+  border: 1px solid #28323f;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #0a0e14;
+  padding: 2px 6px;
+  color: #94a3b8;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+}
+
+summary::-webkit-details-marker {
+  color: #64748b;
+}
+
+/* ---- surfaces & motion ---- */
+.hud-panel {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background:
+    radial-gradient(circle at 0 0, rgba(0, 230, 118, 0.055), transparent 45%),
+    rgba(10, 15, 21, 0.91);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.brand-mark {
+  box-shadow: 0 5px 18px rgba(0, 230, 118, 0.16);
 }
 
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
-@keyframes spin-slow { to { transform: rotate(360deg); } }
-.spin { animation: spin-slow 0.9s linear infinite; }
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: spin-slow 0.9s linear infinite;
+}
 
 @keyframes tt-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.tt-in { animation: tt-in .25s ease both; }
+.tt-in {
+  animation: tt-in 0.25s ease both;
+}
+
+@keyframes empty-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.empty-state {
+  animation: empty-in 0.4s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

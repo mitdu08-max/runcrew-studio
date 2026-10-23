@@ -1,16 +1,16 @@
 import { useMemo, useRef, useState } from "react";
-import { Mountain, MousePointer2 } from "lucide-react";
+import { Loader2, Mountain, MousePointer2 } from "lucide-react";
 import { decimateIdx, eleAtM, fmtKm } from "../lib/geo";
-import type { TrackState } from "../hooks/useSimulation";
+import type { RoutePhase, TrackState } from "../hooks/useSimulation";
 
 interface Props {
   track: TrackState | null;
   progressM: number | null;
-  phase: string;
+  phase: RoutePhase;
   onProbe: (d: number | null) => void;
 }
 
-export default function ElevationChart({ track, progressM, onProbe }: Props) {
+export default function ElevationChart({ track, progressM, phase, onProbe }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{ d: number; x: number } | null>(null);
 
@@ -194,12 +194,22 @@ export default function ElevationChart({ track, progressM, onProbe }: Props) {
               </div>
             )}
           </>
+        ) : phase === "routing" || phase === "elevation" ? (
+          <div className="flex h-full items-center justify-center gap-3 text-slate-500">
+            <Loader2 size={17} className="spin text-amberx" />
+            <div>
+              <div className="text-[11px] font-semibold text-slate-300">
+                {phase === "routing" ? "Construction de la géométrie…" : "Lecture du modèle de terrain…"}
+              </div>
+              <div className="mt-0.5 text-[9.5px]">Le profil apparaîtra automatiquement après la synchronisation.</div>
+            </div>
+          </div>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-600">
-            <MousePointer2 size={16} />
-            <p className="max-w-xs text-center text-[11px] leading-relaxed">
-              Clique au moins <span className="font-bold text-slate-400">2 points</span> sur la carte :
-              la trace suit la route (OSRM) puis le profil d'altitude <span className="font-bold text-amberx/80">réel</span> se dessine ici.
+          <div className="flex h-full items-center justify-center gap-3 text-slate-600">
+            <MousePointer2 size={18} />
+            <p className="max-w-md text-[10.5px] leading-relaxed">
+              Pose au moins <span className="font-semibold text-slate-400">2 points</span> sur la carte.
+              Le profil d’altitude <span className="font-semibold text-amberx/80">réel</span> se dessinera ici.
             </p>
           </div>
         )}

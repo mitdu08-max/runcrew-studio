@@ -20,6 +20,8 @@ import { fetchDenseProfile, fetchPointElevation } from "../lib/elevation";
 
 export type Activity = "running" | "cycling" | "hiking" | "pacer";
 export type RoutePhase = "empty" | "routing" | "elevation" | "ready" | "direct";
+export type GpsMode = "nominal" | "degraded" | "lost";
+export type EventTone = "info" | "success" | "warning";
 
 export interface TrackState {
   points: Pt[];
@@ -47,6 +49,16 @@ export interface Telemetry {
   loss: number;
   elapsedS: number;
   eleReal: boolean;
+  accuracy: number | null;
+  gpsMode: GpsMode;
+}
+
+export interface SessionEvent {
+  id: number;
+  wallTime: string;
+  elapsedS: number;
+  message: string;
+  tone: EventTone;
 }
 
 interface SavedEntry {
@@ -56,10 +68,18 @@ interface SavedEntry {
 }
 
 const LS_KEY = "rc_saved_tracks";
+const DEMO_LOOP: Pt[] = [
+  [43.4217, 6.675192],
+  [43.42415, 6.6809],
+  [43.41865, 6.68365],
+  [43.41695, 6.67645],
+];
 
 export function useSimulation() {
   const [activity, setActivity] = useState<Activity>("running");
   const [speedKmh, setSpeedKmh] = useState(11);
+  const [timeScale, setTimeScaleState] = useState(1);
+  const [gpsMode, setGpsModeState] = useState<GpsMode>("nominal");
   const [waypoints, setWaypoints] = useState<Pt[]>([]);
   const [loopClosed, setLoopClosed] = useState(true);
   const [phase, setPhase] = useState<RoutePhase>("empty");
@@ -69,6 +89,7 @@ export function useSimulation() {
   const [paused, setPaused] = useState(false);
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [savedNames, setSavedNames] = useState<string[]>([]);
+  const [events, setEvents] = useState<SessionEvent[]>([]);
   const [flySignal, setFlySignal] = useState<{ lat: number; lon: number; seq: number } | null>(null);
 
   const seqRef = useRef(0);
@@ -77,10 +98,14 @@ export function useSimulation() {
   trackRef.current = track;
   const speedRef = useRef(speedKmh);
   speedRef.current = speedKmh;
+  const timeScaleRef = useRef(timeScale);
+  timeScaleRef.current = timeScale;
+  const gpsModeRef = useRef(gpsMode);
+  gpsModeRef.current = gpsMode;
   const depEleRef = useRef(departureEle);
   depEleRef.current = departureEle;
 
-  // compteurs de session (refs pour le tick 4 Hz)
+  // Compteurs de session (refs pour le tick 4 Hz).
   const prog = useRef(0);
   const session = useRef(0);
   const lapsN = useRef(0);
@@ -88,8 +113,21 @@ export function useSimulation() {
   const lossR = useRef(0);
   const prevAlt = useRef<number | null>(null);
   const elapsed = useRef(0);
+  const lastFix = useRef<{ pos: Pt; alt: number | null; heading: number } | null>(null);
+  const eventId = useRef(0);
 
-  // ---- parcours sauvegardés (format compatible avec ta version .exe) ----
+  const logEvent = useCallback((message: string, tone: EventTone = "info") => {
+    const event: SessionEvent = {
+      id: ++eventId.current,
+      wallTime: new Date().toLocaleTimeString("fr-FR", { hour12: false }),
+      elapsedS: elapsed.current,
+      message,
+      tone,
+    };
+    setEvents((current) => [...current.slice(-79), event]);
+  }, []);
+
+  // ---- parcours sauvegardés (format compatible avec la version .exe) ----
   const refreshSaved = useCallback(() => {
     try {
       const s = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
@@ -101,7 +139,7 @@ export function useSimulation() {
 
   useEffect(refreshSaved, [refreshSaved]);
 
-  // ---- altitude du point de départ dès le 1er clic (fix "315 m ignoré") ----
+  // ---- altitude du point de départ dès le 1er clic ----
   useEffect(() => {
     let alive = true;
     if (waypoints.length === 1) {
@@ -141,12 +179,14 @@ export function useSimulation() {
                 lossTotal: null,
                 fallback: false,
               }
-            : null
+            : null,
         );
         setPhase("empty");
         return;
       }
+
       setPhase("routing");
+      setTrack(null);
       const wps = waypoints.slice();
       if (loopClosed && waypoints.length > 2) wps.push(waypoints[0]);
 
@@ -178,9 +218,16 @@ export function useSimulation() {
         fallback: route.fallback,
       });
       setPhase(route.fallback ? "direct" : "ready");
+
+      const distance = (cum[cum.length - 1] / 1000).toFixed(2);
+      if (route.fallback) {
+        logEvent(`Routage indisponible · trace directe de ${distance} km`, "warning");
+      } else {
+        logEvent(`Parcours synchronisé · ${distance} km`, "success");
+      }
+      if (!ele) logEvent("Élévation indisponible · altitude du départ conservée", "warning");
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, activity, loopClosed]);
+  }, [waypoints, activity, loopClosed, logEvent]);
 
   // ---- tick ----
   const advance = useCallback((dt: number) => {
@@ -219,16 +266,43 @@ export function useSimulation() {
         slope = slopeAtM(t.cum, t.ele, p);
       }
     } else {
-      // Fallback honnête : on affiche l'altitude réelle du départ (plate),
-      // jamais une sinusoïde fantaisiste.
-      const base = depEleRef.current;
-      alt = base != null ? base : null;
+      // Fallback honnête : altitude réelle du départ, jamais une sinusoïde inventée.
+      alt = depEleRef.current;
+    }
+
+    // Les scénarios GPS altèrent le fix présenté, pas la trace de référence.
+    // En perte de signal, le dernier fix reste visible pendant que le chrono avance.
+    const mode = gpsModeRef.current;
+    let displayPos = cur.pos;
+    let displayHeading = heading;
+    let accuracy: number | null = Math.round((2.8 + Math.abs(Math.sin(elapsed.current * 0.4)) * 0.8) * 10) / 10;
+
+    if (mode !== "lost") {
+      if (mode === "degraded") {
+        const north = Math.sin(elapsed.current * 2.17) * 7 + Math.sin(elapsed.current * 0.73) * 4;
+        const east = Math.cos(elapsed.current * 1.61) * 8 + Math.sin(elapsed.current * 0.51) * 5;
+        displayPos = [
+          cur.pos[0] + north / 111320,
+          cur.pos[1] + east / (111320 * Math.max(0.2, Math.cos((cur.pos[0] * Math.PI) / 180))),
+        ];
+        displayHeading = (heading + Math.sin(elapsed.current * 1.9) * 22 + 360) % 360;
+        accuracy = Math.round((18 + Math.abs(Math.sin(elapsed.current * 0.83)) * 14) * 10) / 10;
+      }
+      lastFix.current = { pos: displayPos, alt, heading: displayHeading };
+    } else {
+      accuracy = null;
+      slope = null;
+      if (lastFix.current) {
+        displayPos = lastFix.current.pos;
+        displayHeading = lastFix.current.heading;
+        alt = lastFix.current.alt;
+      }
     }
 
     setTelemetry({
-      lat: cur.pos[0],
-      lon: cur.pos[1],
-      heading,
+      lat: displayPos[0],
+      lon: displayPos[1],
+      heading: displayHeading,
       alt,
       slope: slope != null ? Math.round(slope * 10) / 10 : null,
       speedKmh: speedRef.current,
@@ -239,16 +313,18 @@ export function useSimulation() {
       loss: lossR.current,
       elapsedS: elapsed.current,
       eleReal,
+      accuracy,
+      gpsMode: mode,
     });
   }, []);
 
   useEffect(() => {
     if (!running || paused) return;
-    const iv = setInterval(() => advance(0.25), 250);
+    const iv = setInterval(() => advance(0.25 * timeScaleRef.current), 250);
     return () => clearInterval(iv);
   }, [running, paused, advance]);
 
-  // ---- actions ----
+  // ---- actions de pilotage ----
   const start = useCallback((): boolean => {
     const t = trackRef.current;
     if (!t || t.points.length < 2) return false;
@@ -258,23 +334,87 @@ export function useSimulation() {
     gainR.current = 0;
     lossR.current = 0;
     elapsed.current = 0;
+    lastFix.current = null;
     prevAlt.current = t.ele ? t.ele[0] : depEleRef.current;
     setRunning(true);
     setPaused(false);
-    advance(0); // 1re position immédiate : altitude = élévation réelle du départ
+    advance(0);
+    logEvent(
+      `Simulation démarrée · ${speedRef.current.toFixed(1)} km/h · ×${timeScaleRef.current}`,
+      "success",
+    );
     return true;
-  }, [advance]);
+  }, [advance, logEvent]);
 
   const stop = useCallback(() => {
+    logEvent(
+      `Simulation arrêtée · ${(session.current / 1000).toFixed(2)} km · ${Math.round(elapsed.current)} s simulées`,
+      "info",
+    );
     setRunning(false);
     setPaused(false);
     setTelemetry(null);
-  }, []);
+  }, [logEvent]);
 
-  const togglePause = useCallback(() => setPaused((p) => !p), []);
+  const togglePause = useCallback(() => {
+    const nextPaused = !paused;
+    setPaused(nextPaused);
+    logEvent(nextPaused ? "Simulation mise en pause" : "Simulation reprise", nextPaused ? "info" : "success");
+  }, [paused, logEvent]);
 
-  const addWaypoint = useCallback((p: Pt) => setWaypoints((w) => [...w, p]), []);
-  const undoWaypoint = useCallback(() => setWaypoints((w) => (w.length ? w.slice(0, -1) : w)), []);
+  const setTimeScale = useCallback(
+    (value: number) => {
+      const next = [1, 2, 4, 8].includes(value) ? value : 1;
+      if (next === timeScaleRef.current) return;
+      timeScaleRef.current = next;
+      setTimeScaleState(next);
+      logEvent(`Horloge de test réglée sur ×${next}`, "info");
+    },
+    [logEvent],
+  );
+
+  const setGpsMode = useCallback(
+    (mode: GpsMode) => {
+      if (mode === gpsModeRef.current) return;
+      gpsModeRef.current = mode;
+      setGpsModeState(mode);
+      if (mode === "nominal") logEvent("Signal GPS nominal rétabli", "success");
+      else if (mode === "degraded") logEvent("GPS dégradé injecté · gigue et précision élargie", "warning");
+      else logEvent("Perte GPS injectée · conservation du dernier fix", "warning");
+    },
+    [logEvent],
+  );
+
+  // ---- actions de parcours ----
+  const addWaypoint = useCallback(
+    (p: Pt) => {
+      setWaypoints((w) => [...w, p]);
+      logEvent("Point de contrôle ajouté", "info");
+    },
+    [logEvent],
+  );
+
+  const moveWaypoint = useCallback(
+    (index: number, p: Pt) => {
+      setWaypoints((current) => current.map((point, i) => (i === index ? p : point)));
+      logEvent(`Point ${index + 1} déplacé sur la carte`, "info");
+    },
+    [logEvent],
+  );
+
+  const removeWaypoint = useCallback(
+    (index: number) => {
+      setWaypoints((current) => current.filter((_, i) => i !== index));
+      logEvent(`Point ${index + 1} supprimé`, "info");
+    },
+    [logEvent],
+  );
+
+  const undoWaypoint = useCallback(() => {
+    setWaypoints((w) => (w.length ? w.slice(0, -1) : w));
+    logEvent("Dernier point annulé", "info");
+  }, [logEvent]);
+
   const clearTrack = useCallback(() => {
     setRunning(false);
     setPaused(false);
@@ -285,8 +425,21 @@ export function useSimulation() {
     abortRef.current?.abort();
     setTrack(null);
     setPhase("empty");
-  }, []);
+    logEvent("Parcours effacé", "info");
+  }, [logEvent]);
+
   const toggleLoop = useCallback((v: boolean) => setLoopClosed(v), []);
+
+  const loadDemo = useCallback(() => {
+    setRunning(false);
+    setPaused(false);
+    setTelemetry(null);
+    setActivity("running");
+    setLoopClosed(true);
+    setWaypoints(DEMO_LOOP);
+    setFlySignal({ lat: DEMO_LOOP[0][0], lon: DEMO_LOOP[0][1], seq: Date.now() });
+    logEvent("Boucle d’exemple chargée · Roquebrune", "success");
+  }, [logEvent]);
 
   const saveTrack = useCallback(
     (name: string) => {
@@ -298,9 +451,10 @@ export function useSimulation() {
       store[name.trim()] = { waypoints, activity, loopClosed };
       localStorage.setItem(LS_KEY, JSON.stringify(store));
       refreshSaved();
+      logEvent(`Parcours « ${name.trim()} » sauvegardé`, "success");
       return true;
     },
-    [waypoints, activity, loopClosed, refreshSaved]
+    [waypoints, activity, loopClosed, refreshSaved, logEvent],
   );
 
   const loadTrack = useCallback(
@@ -320,22 +474,30 @@ export function useSimulation() {
       if (entry.waypoints.length > 0) {
         setFlySignal({ lat: entry.waypoints[0][0], lon: entry.waypoints[0][1], seq: Date.now() });
       }
+      logEvent(`Parcours « ${name} » chargé`, "success");
       return true;
     },
-    []
+    [logEvent],
   );
 
   const exportGpx = useCallback((): string | null => {
     const t = trackRef.current;
     if (!t || t.points.length < 2 || !t.ele) return null;
+    logEvent("Export GPX avec élévations généré", "success");
     return buildGpx(t.points, t.ele, t.cum, speedRef.current, "Parcours RunCrew");
-  }, []);
+  }, [logEvent]);
+
+  const clearEvents = useCallback(() => setEvents([]), []);
 
   return {
     activity,
     setActivity,
     speedKmh,
     setSpeedKmh,
+    timeScale,
+    setTimeScale,
+    gpsMode,
+    setGpsMode,
     waypoints,
     loopClosed,
     toggleLoop,
@@ -346,13 +508,19 @@ export function useSimulation() {
     paused,
     telemetry,
     savedNames,
+    events,
+    logEvent,
+    clearEvents,
     flySignal,
     start,
     stop,
     togglePause,
     addWaypoint,
+    moveWaypoint,
+    removeWaypoint,
     undoWaypoint,
     clearTrack,
+    loadDemo,
     saveTrack,
     loadTrack,
     exportGpx,

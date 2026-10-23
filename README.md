@@ -61,6 +61,16 @@ Le Dashboard s'ouvre automatiquement sur `http://localhost:9877`.
 ```
 L'exécutable autonome est généré directement sur le Bureau Windows via `pkg` (Node 18 x64).
 
+### 3. Lancer l’interface React modernisée
+```bash
+cd ui_web
+npm install
+npm run dev
+```
+Cette interface propose le parcours déplaçable, les scénarios GPS, l’accélération du temps et les rapports de session. Ses scénarios sont locaux au simulateur React ; le pont téléphone reste assuré par le moteur historique `server.js`.
+
+Les choix d’interface et les prochaines priorités sont détaillés dans [`AUDIT_UX.md`](./AUDIT_UX.md).
+
 ---
 
 ## 📁 Structure du Répertoire
